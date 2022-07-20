@@ -51,7 +51,7 @@ def train_epoch(
     cur_global_batch_size = cfg.NUM_SHARDS * cfg.TRAIN.BATCH_SIZE
     num_iters = cfg.GLOBAL_BATCH_SIZE // cur_global_batch_size
 
-    for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
+    for cur_iter, (inputs, labels, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
@@ -206,7 +206,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
     model.eval()
     val_meter.iter_tic()
 
-    for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
+    for cur_iter, (inputs, labels, meta) in enumerate(val_loader):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -423,7 +423,7 @@ def train(cfg):
 
     # Create the video train and val loaders.
     train_loader = loader.construct_loader(cfg, "train")
-    val_loader = loader.construct_loader(cfg, "val")
+    val_loader = loader.construct_loader(cfg, "test")
 
     precise_bn_loader = (
         loader.construct_loader(cfg, "train", is_precise_bn=True)

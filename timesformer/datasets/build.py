@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 from fvcore.common.registry import Registry
+from .vce_dataloader import VCEDataset
 
 DATASET_REGISTRY = Registry("DATASET")
 DATASET_REGISTRY.__doc__ = """
@@ -26,5 +27,7 @@ def build_dataset(dataset_name, cfg, split):
     # Capitalize the the first letter of the dataset_name since the dataset_name
     # in configs may be in lowercase but the name of dataset class should always
     # start with an uppercase letter.
+    if dataset_name == "emotions":
+        return VCEDataset(cfg.DATA.PATH_TO_DATA_DIR, split=split, video_width=256, video_height=256, num_frames=8)
     name = dataset_name.capitalize()
     return DATASET_REGISTRY.get(name)(cfg, split)

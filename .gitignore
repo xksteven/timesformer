@@ -1,6 +1,6 @@
 
-
-
+# Pytorch models
+*.pyth
 
 # Docker file from Python is inspired from here :
 # https://github.com/github/gitignore/blob/master/Python.gitignore
