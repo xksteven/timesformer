@@ -51,21 +51,23 @@ def train_epoch(
     cur_global_batch_size = cfg.NUM_SHARDS * cfg.TRAIN.BATCH_SIZE
     num_iters = cfg.GLOBAL_BATCH_SIZE // cur_global_batch_size
 
-    for cur_iter, (inputs, labels, meta) in enumerate(train_loader):
+    for cur_iter, (inputs, labels, _, meta) in enumerate(train_loader):
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
+                    inputs[i] = inputs[i].float().cuda(non_blocking=True)
             else:
-                inputs = inputs.cuda(non_blocking=True)
+                inputs = inputs.float().cuda(non_blocking=True)
             labels = labels.cuda()
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
-                else:
-                    meta[key] = val.cuda(non_blocking=True)
+            # for key, val in meta.items():
+            #     if isinstance(val, (list,)):
+            #         for i in range(len(val)):
+            #             print(val)
+            #             print(val[i])
+            #             val[i] = val[i].cuda(non_blocking=True)
+            #     else:
+            #         meta[key] = val.cuda(non_blocking=True)
 
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
@@ -84,13 +86,16 @@ def train_epoch(
            inputs, labels = mixup_fn(inputs, labels)
            loss_fun = SoftTargetCrossEntropy()
 
+        # print(f"inputs size = {inputs.size()}")
         if cfg.DETECTION.ENABLE:
             preds = model(inputs, meta["boxes"])
         else:
             preds = model(inputs)
 
         # Compute the loss.
+        # print(f"preds size = {preds.size()} labels = {labels}")
         loss = loss_fun(preds, labels)
+        # print(f"loss = {loss}")
 
         if cfg.MIXUP.ENABLED:
             labels = hard_labels
@@ -206,21 +211,21 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
     model.eval()
     val_meter.iter_tic()
 
-    for cur_iter, (inputs, labels, meta) in enumerate(val_loader):
+    for cur_iter, (inputs, labels, _, meta) in enumerate(val_loader):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
+                    inputs[i] = inputs[i].float().cuda(non_blocking=True)
             else:
-                inputs = inputs.cuda(non_blocking=True)
+                inputs = inputs.float().cuda(non_blocking=True)
             labels = labels.cuda()
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
-                else:
-                    meta[key] = val.cuda(non_blocking=True)
+            # for key, val in meta.items():
+            #     if isinstance(val, (list,)):
+            #         for i in range(len(val)):
+            #             val[i] = val[i].cuda(non_blocking=True)
+            #     else:
+            #         meta[key] = val.cuda(non_blocking=True)
         val_meter.data_toc()
 
         if cfg.DETECTION.ENABLE:

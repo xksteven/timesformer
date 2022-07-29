@@ -67,7 +67,8 @@ class VCEDataset(Dataset):
         video = loadvideo_decord(self.video_paths[idx], self.video_width, self.video_height, self.num_frames)
         label = self.labels[idx]
         md = self.metadata[idx]
-        return video, label, md
+        video = np.transpose(video, (3,0,1,2))
+        return video, label, idx, md
 
     def get_path_and_label(self, label_obj):
         # Convert from 27-vector of emotion scores to a single classification label corresponding to the max-scoring emotion
