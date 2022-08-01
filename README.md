@@ -1,4 +1,47 @@
-# TimeSformer
+# Emotions Reproducibility notes.
+
+We tested with 
+
+| TimeSformer | K400 | 8 | 224 | 77.9 | 93.2 | [model](https://www.dropbox.com/s/g5t24we9gl5yk88/TimeSformer_divST_8x32_224_K400.pyth?dl=0) |
+
+How we installed:
+
+```
+# We used miniconda
+conda create -n timesformer python=3.7 -y
+conda activate timesformer
+conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c conda-forge
+conda install torchvision -c pytorch
+pip install 'git+https://github.com/facebookresearch/fvcore'
+pip install click joblib regex python-dateutil
+pip install boto3 jinja2 urllib3
+pip install click joblib regex python-dateutil
+pip install simplejson einops timm
+conda install av -c conda-forge
+pip install psutil scikit-learn opencv-python tensorboard
+pip install pyzmq tornado websocket-client pandas matplotlib motmetrics visdom
+pip install cython pycocotools
+pip install av --force-reinstall
+
+cd timesformer
+python setup.py build develop
+```
+
+How to run
+
+We ran on 4 40GB A100s. 
+
+```python
+python tools/run_net.py \
+  --cfg configs/emotions/TimeSformer_divST_8x32_224_4gpus.yaml
+
+# or 
+python tools/run_net.py \
+  --cfg configs/emotions/v2v_pairwise_TimeSformer_divST_8x32_224_4gpus.yaml
+```
+
+
+# Official TimeSformer Readme
 
 This is an official pytorch implementation of our ICML 2021 paper [Is Space-Time Attention All You Need for Video Understanding?](https://arxiv.org/pdf/2102.05095.pdf). In this repository, we provide PyTorch code for training and testing our proposed TimeSformer model. TimeSformer provides an efficient video classification framework that achieves state-of-the-art results on several video action recognition benchmarks such as Kinetics-400.
 
