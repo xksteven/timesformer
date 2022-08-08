@@ -49,34 +49,35 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
 
     for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
         if cfg.NUM_GPUS:
-            # Transfer the data to the current GPU device.
+            # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
+                    inputs[i] = inputs[i].float().cuda(non_blocking=True)
             else:
-                inputs = inputs.cuda(non_blocking=True)
+                inputs = inputs.float().cuda(non_blocking=True)
 
-            # Transfer the data to the current GPU device.
-            video_idx = video_idx.cuda()
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
-                else:
-                    meta[key] = val.cuda(non_blocking=True)
         test_meter.data_toc()
 
-        # Perform the forward pass.
-        preds = model(inputs)
+        # logits = model(inputs)
+        logits_0 = model(inputs[0])
+        logits_1 = model(inputs[1])
 
-        # Gather all the predictions across all the devices to perform ensemble.
+        diffs = (logits_1 - logits_0).squeeze(dim=1)
+
+        preds = diffs
+        labels = torch.ones(diffs.shape[0]).cuda()
+
+        top1_err = None
+
+        # Compute the errors.
+        errors = torch.sigmoid(preds) > 0.5 
+        top1_err = torch.sum(1.0 - errors.float()) / diffs.size(0) 
+
         if cfg.NUM_GPUS > 1:
-            preds, video_idx = du.all_gather(
-                [preds, video_idx]
-            )
-        if cfg.NUM_GPUS:
-            preds = preds.cpu()
-            video_idx = video_idx.cpu()
+            top1_err = du.all_reduce([top1_err])
+
+        # Copy the errors from GPU to CPU (sync point).
+        top1_err = top1_err[0].item()
 
         test_meter.iter_toc()
         # Update and log stats.
@@ -87,11 +88,11 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
 
         test_meter.iter_tic()
 
-    # Log epoch stats and print the final testing results.
     all_preds = test_meter.video_preds.clone().detach()
+    all_labels = test_meter.video_labels
     if cfg.NUM_GPUS:
         all_preds = all_preds.cpu()
-
+        all_labels = all_labels.cpu()
     if writer is not None:
         writer.plot_eval(preds=all_preds, labels=all_labels)
 
@@ -106,6 +107,44 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
         )
 
     test_meter.finalize_metrics()
+    # Listwise evaluation
+    all_predictions = []
+    for cur_iter, (inputs, _, _, meta) in enumerate(listwise_loader):
+        if cfg.NUM_GPUS:
+            # Transferthe data to the current GPU device.
+            if isinstance(inputs, (list,)):
+                for i in range(len(inputs)):
+                    inputs[i] = inputs[i].float().cuda(non_blocking=True)
+            else:
+                inputs = inputs.float().cuda(non_blocking=True)
+
+        stacked_inputs = torch.cat(inputs, 0)
+        # for vid_batch in inputs:
+        logits = model(stacked_inputs)
+
+        if cfg.NUM_GPUS > 1:
+            preds = du.all_gather(logits)
+
+        for pred in preds:
+            all_predictions.append(pred.cpu().data.numpy())
+
+    correct = 0
+    for sublist in all_predictions:
+        prev = -float('inf')
+        curr_correct = True
+        # Correct predictions must be in sorted order (small to large)
+        for val in sublist:
+            if val < prev:
+                curr_correct = False
+                break
+            else:
+                prev = val
+
+        if curr_correct:
+            correct += 1
+    total = len(all_predictions)
+    logger.info("V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
+
     return test_meter
 
 
