@@ -68,15 +68,16 @@ class VCEDataset(Dataset):
         label = self.labels[idx]
         md = self.metadata[idx]
         video = np.transpose(video, (3,0,1,2))
+        #print(f"label in get item in dataloader {label}")
         return video, label, idx, md
 
     def get_path_and_label(self, label_obj):
         # Convert from 27-vector of emotion scores to a single classification label corresponding to the max-scoring emotion
         emotions_and_scores = sorted(list(label_obj["emotions"].items())) # Make sure they are sorted alphabetically
         scores = [score for emotion, score in emotions_and_scores]
-        label = int(np.argmax(scores))
+        #label = int(np.argmax(scores))
         path = str(self.data_path / label_obj['file'])
-        return path, label
+        return path, scores
 
 
 if __name__ == '__main__':

@@ -45,7 +45,8 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
     """
     # Enable eval mode.
     model.eval()
-    test_meter.iter_tic()
+    #test_meter.iter_tic()
+    pairwise_error = 0
 
     for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
         if cfg.NUM_GPUS:
@@ -56,7 +57,8 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
 
-        test_meter.data_toc()
+
+        #test_meter.data_toc()
 
         # logits = model(inputs)
         logits_0 = model(inputs[0])
@@ -78,35 +80,25 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
 
         # Copy the errors from GPU to CPU (sync point).
         top1_err = top1_err[0].item()
+        pairwise_error += top1_err
 
-        test_meter.iter_toc()
+        #test_meter.iter_toc()
         # Update and log stats.
-        test_meter.update_stats(
-            preds.detach(), video_idx.detach()
-        )
-        test_meter.log_iter_stats(cur_iter)
+        #test_meter.update_stats(
+        #    preds.detach(), labels, video_idx.detach()
+        #)
+        #test_meter.log_iter_stats(cur_iter)
 
-        test_meter.iter_tic()
+        #test_meter.iter_tic()
 
-    all_preds = test_meter.video_preds.clone().detach()
-    all_labels = test_meter.video_labels
-    if cfg.NUM_GPUS:
-        all_preds = all_preds.cpu()
-        all_labels = all_labels.cpu()
-    if writer is not None:
-        writer.plot_eval(preds=all_preds, labels=all_labels)
 
-    if cfg.TEST.SAVE_RESULTS_PATH != "":
-        save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
 
-        with PathManager.open(save_path, "wb") as f:
-            pickle.dump([all_labels, all_labels], f)
-
-        logger.info(
-            "Successfully saved prediction results to {}".format(save_path)
+    logger.info(
+            f"Pairwise error = {pairwise_error / len(test_loader)}"
         )
 
-    test_meter.finalize_metrics()
+    #test_meter.finalize_metrics()
+
     # Listwise evaluation
     all_predictions = []
     for cur_iter, (inputs, _, _, meta) in enumerate(listwise_loader):
@@ -130,18 +122,23 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
 
     correct = 0
     for sublist in all_predictions:
-        prev = -float('inf')
-        curr_correct = True
-        # Correct predictions must be in sorted order (small to large)
-        for val in sublist:
-            if val < prev:
-                curr_correct = False
-                break
-            else:
-                prev = val
+       # predict everything in order
+       # prev = -float('inf')
+       # curr_correct = True
+       # # Correct predictions must be in sorted order (small to large)
+       # for val in sublist:
+       #     if val < prev:
+       #         curr_correct = False
+       #         break
+       #     else:
+       #         prev = val
+       # if curr_correct:
+       #     correct += 1
 
-        if curr_correct:
-            correct += 1
+       # Correct if the first video is rated best.
+       if np.argmax(sublist) == 0:
+           correct += 1
+
     total = len(all_predictions)
     logger.info("V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
 
@@ -178,12 +175,12 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
-                    inputs[i] = inputs[i].cuda(non_blocking=True)
+                    inputs[i] = inputs[i].cuda(non_blocking=True).float()
             else:
-                inputs = inputs.cuda(non_blocking=True)
+                inputs = inputs.cuda(non_blocking=True).float()
 
             # Transfer the data to the current GPU device.
-            labels = labels.cuda()
+            labels = labels.cuda().float()
             video_idx = video_idx.cuda()
             #for key, val in meta.items():
             #    if isinstance(val, (list,)):
@@ -207,6 +204,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             video_idx = video_idx.cpu()
 
         test_meter.iter_toc()
+
+        #logger.warn(f"preds = {preds.size()} labels = {labels.size()} video_idx = {video_idx}")
+
         # Update and log stats.
         test_meter.update_stats(
             preds.detach(), labels.detach(), video_idx.detach()
