@@ -185,12 +185,12 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             # Transfer the data to the current GPU device.
             labels = labels.cuda()
             video_idx = video_idx.cuda()
-            for key, val in meta.items():
-                if isinstance(val, (list,)):
-                    for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
-                else:
-                    meta[key] = val.cuda(non_blocking=True)
+            #for key, val in meta.items():
+            #    if isinstance(val, (list,)):
+            #        for i in range(len(val)):
+            #            val[i] = val[i].cuda(non_blocking=True)
+            #    else:
+            #        meta[key] = val.cuda(non_blocking=True)
         test_meter.data_toc()
 
         # Perform the forward pass.

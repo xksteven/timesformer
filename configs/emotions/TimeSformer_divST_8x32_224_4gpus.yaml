@@ -1,6 +1,6 @@
 TRAIN:
   ENABLE: True
-  DATASET: emotions
+  DATASET: emotions_vce
   BATCH_SIZE: 56
   EVAL_PERIOD: 5
   CHECKPOINT_PERIOD: 5
@@ -34,7 +34,7 @@ MODEL:
   DROPOUT_RATE: 0.5
 TEST:
   ENABLE: True
-  DATASET: emotions
+  DATASET: emotions_vce
   BATCH_SIZE: 4
   NUM_ENSEMBLE_VIEWS: 1
   NUM_SPATIAL_CROPS: 3

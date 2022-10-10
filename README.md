@@ -10,10 +10,10 @@ How we installed:
 # We used miniconda
 conda create -n timesformer python=3.7 -y
 conda activate timesformer
-conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c conda-forge
+conda install pytorch torchvision torchaudio cudatoolkit=11.3 -c pytorch
 conda install torchvision -c pytorch
 pip install 'git+https://github.com/facebookresearch/fvcore'
-pip install click joblib regex python-dateutil
+pip install decord click joblib regex python-dateutil
 pip install boto3 jinja2 urllib3
 pip install click joblib regex python-dateutil
 pip install simplejson einops timm
