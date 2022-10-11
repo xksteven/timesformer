@@ -19,11 +19,12 @@ import timesformer.visualization.tensorboard_vis as tb
 from timesformer.datasets import loader
 from timesformer.models import build_model
 from timesformer.utils.meters import TestMeter
+from tqdm import tqdm
 
 logger = logging.get_logger(__name__)
 
 @torch.no_grad()
-def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=None):
+def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, writer=None):
     """
     For classification:
     Perform mutli-view testing that uniformly samples N clips from a video along
@@ -48,7 +49,7 @@ def perform_v2v_test(test_loader, list_loader, model, test_meter, cfg, writer=No
     #test_meter.iter_tic()
     pairwise_error = 0
 
-    for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
+    for cur_iter, (inputs, labels, video_idx, meta) in enumerate(tqdm(test_loader)):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):

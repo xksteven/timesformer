@@ -485,7 +485,21 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                     inputs[i] = inputs[i].float().cuda(non_blocking=True)
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
-            labels = labels.cuda()
+            if isinstance(labels, (list,)):
+                new_labels = labels[0]
+                new_labels = new_labels.unsqueeze(1)
+                for i in range(1, len(labels)):
+                    tmp_labels = labels[i].unsqueeze(1)
+                    new_labels = torch.cat((new_labels, tmp_labels), dim=1)
+
+                #logger.info(f"new_labels size = {new_labels.size()}")
+                labels = new_labels
+            labels = labels.float().cuda(non_blocking=True)
+
+        if len(labels.size()) > 1:
+            one_hot_labels = torch.argmax(labels, dim=1)
+        else:
+            one_hot_labels = labels
 
         val_meter.data_toc()
 
@@ -496,7 +510,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
                 preds, labels = du.all_gather([preds, labels])
         else:
             # Compute the errors.
-            num_topks_correct = metrics.topks_correct(preds, labels, (1, 5))
+            num_topks_correct = metrics.topks_correct(preds, one_hot_labels, (1, 3))
 
             # Combine the errors across the GPUs.
             top1_err, top5_err = [
@@ -521,7 +535,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, writer=None):
             # write to tensorboard format if available.
             if writer is not None:
                 writer.add_scalars(
-                    {"Val/Top1_err": top1_err, "Val/Top5_err": top5_err},
+                    {"Val/Top1_err": top1_err, "Val/Top3_err": top5_err},
                     global_step=len(val_loader) * cur_epoch + cur_iter,
                 )
 
