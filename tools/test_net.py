@@ -21,7 +21,9 @@ from timesformer.models import build_model
 from timesformer.utils.meters import TestMeter
 from tqdm import tqdm
 
+
 logger = logging.get_logger(__name__)
+
 
 @torch.no_grad()
 def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, writer=None):
@@ -46,10 +48,10 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
     """
     # Enable eval mode.
     model.eval()
-    #test_meter.iter_tic()
     pairwise_error = 0
 
-    for cur_iter, (inputs, labels, video_idx, meta) in enumerate(tqdm(test_loader)):
+    test_meter.iter_tic()
+    for cur_iter, (inputs, labels, video_idx, meta) in enumerate(test_loader):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -59,7 +61,7 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
                 inputs = inputs.float().cuda(non_blocking=True)
 
 
-        #test_meter.data_toc()
+        test_meter.data_toc()
 
         # logits = model(inputs)
         logits_0 = model(inputs[0])
@@ -68,30 +70,31 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
         diffs = (logits_1 - logits_0).squeeze(dim=1)
 
         preds = diffs
-        labels = torch.ones(diffs.shape[0]).cuda()
+        labels = torch.ones(diffs.shape[0])
 
         top1_err = None
 
-        # Compute the errors.
+        # # Compute the errors.
         errors = torch.sigmoid(preds) > 0.5 
         top1_err = torch.sum(1.0 - errors.float()) / diffs.size(0) 
 
         if cfg.NUM_GPUS > 1:
             top1_err = du.all_reduce([top1_err])
 
+
         # Copy the errors from GPU to CPU (sync point).
         top1_err = top1_err[0].item()
         pairwise_error += top1_err
 
-        #test_meter.iter_toc()
+        test_meter.iter_toc()
+
         # Update and log stats.
-        #test_meter.update_stats(
-        #    preds.detach(), labels, video_idx.detach()
-        #)
-        #test_meter.log_iter_stats(cur_iter)
+        test_meter.update_stats(
+            preds.cpu().detach(), labels.detach(), video_idx.detach()
+        )
+        test_meter.log_iter_stats(cur_iter)
 
-        #test_meter.iter_tic()
-
+        test_meter.iter_tic()
 
 
     logger.info(
@@ -102,7 +105,7 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
 
     # Listwise evaluation
     all_predictions = []
-    for cur_iter, (inputs, _, _, meta) in enumerate(listwise_loader):
+    for cur_iter, (inputs, _, _, meta) in enumerate(tqdm(listwise_loader)):
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -111,37 +114,63 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
 
+
+        # The inputs come in as a list of 2 stacks of 3 each.  
+        # lets just run the whole set of 6 through the model in one go.
         stacked_inputs = torch.cat(inputs, 0)
         # for vid_batch in inputs:
         logits = model(stacked_inputs)
-
+       
         if cfg.NUM_GPUS > 1:
             preds = du.all_gather(logits)
 
+
+        #logger.info(f"preds before = {preds}")
+        # Here's where things get messy because the dimensions of this are gpus x logits x 2
+        # so we need to split the logits in half and across each group too.
+        # Ultimately we want a row in preds to be the result of 1 set of movies logits.
+        _first_half = preds[:len(preds)//2]
+        _second_half = preds[len(preds)//2:]
+
+
+        _first_half = torch.stack(_first_half, 0).T
+        _second_half = torch.stack(_second_half, 0).T
+
+
+        tmp = []
+        tmp.append(_first_half)
+        tmp.append(_second_half)
+
+        tmp = torch.cat(tmp, 0)
+        #logger.info(f"tmp size = {tmp.size()}")
+        preds = tmp
         for pred in preds:
             all_predictions.append(pred.cpu().data.numpy())
+
 
     correct = 0
     for sublist in all_predictions:
        # predict everything in order
-       # prev = -float('inf')
-       # curr_correct = True
-       # # Correct predictions must be in sorted order (small to large)
-       # for val in sublist:
-       #     if val < prev:
-       #         curr_correct = False
-       #         break
-       #     else:
-       #         prev = val
-       # if curr_correct:
-       #     correct += 1
-
-       # Correct if the first video is rated best.
-       if np.argmax(sublist) == 0:
+       prev = -float('inf')
+       curr_correct = True
+       # Correct predictions must be in sorted order (small to large)
+       for val in sublist:
+           if val < prev:
+               curr_correct = False
+               break
+           else:
+               prev = val
+       if curr_correct:
            correct += 1
 
+       # Correct if the first video is rated best.
+       # if np.argmax(sublist) == 0:
+       #     correct += 1
+
     total = len(all_predictions)
-    logger.info("V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
+    logger.info(
+        f"len listwise = {len(listwise_loader)}, gpus * batchsize * len loader = {cfg.NUM_GPUS * len(listwise_loader)}\n"
+        "V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
 
     return test_meter
 
