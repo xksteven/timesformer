@@ -106,8 +106,10 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
     # Listwise evaluation
     all_predictions = []
     for cur_iter, (inputs, _, _, meta) in enumerate(tqdm(listwise_loader)):
+        logger.info(f"inputs = {inputs} ")
+        logger.info(f"size of inputs0 = {inputs[0].size()} ")
         if cfg.NUM_GPUS:
-            # Transferthe data to the current GPU device.
+            # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
                 for i in range(len(inputs)):
                     inputs[i] = inputs[i].float().cuda(non_blocking=True)
@@ -210,7 +212,16 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 inputs = inputs.cuda(non_blocking=True).float()
 
             # Transfer the data to the current GPU device.
-            labels = labels.cuda().float()
+            if isinstance(labels, (list,)):
+                new_labels = labels[0]
+                new_labels = new_labels.unsqueeze(1)
+                for i in range(1, len(labels)):
+                    tmp_labels = labels[i].unsqueeze(1)
+                    new_labels = torch.cat((new_labels, tmp_labels), dim=1)
+
+                #logger.info(f"new_labels size = {new_labels.size()}")
+                labels = new_labels
+            labels = labels.float().cuda(non_blocking=True)
             video_idx = video_idx.cuda()
             #for key, val in meta.items():
             #    if isinstance(val, (list,)):
@@ -218,6 +229,11 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             #            val[i] = val[i].cuda(non_blocking=True)
             #    else:
             #        meta[key] = val.cuda(non_blocking=True)
+
+        if len(labels.size()) > 1:
+            one_hot_labels = torch.argmax(labels, dim=1)
+        else:
+            one_hot_labels = labels
         test_meter.data_toc()
 
         # Perform the forward pass.
@@ -239,7 +255,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
         # Update and log stats.
         test_meter.update_stats(
-            preds.detach(), labels.detach(), video_idx.detach()
+            preds.detach(), one_hot_labels.detach(), video_idx.detach()
         )
         test_meter.log_iter_stats(cur_iter)
 

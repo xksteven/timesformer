@@ -52,6 +52,8 @@ def train_v2v_epoch(
     num_iters = cfg.GLOBAL_BATCH_SIZE // cur_global_batch_size
 
     for cur_iter, (inputs, _, _, meta) in enumerate(train_loader):
+        logger.info(f"inputs = {inputs} ")
+        logger.info(f"size of inputs0 = {inputs[0].size()} ")
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
