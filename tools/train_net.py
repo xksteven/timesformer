@@ -66,7 +66,6 @@ def train_v2v_epoch(
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
 
-        # print(f"len inputs {len(inputs)}, input[0] shape = {inputs[0].size()}")
         # Update the learning rate.
         lr = optim.get_epoch_lr(cur_epoch + float(cur_iter) / data_size, cfg)
         optim.set_lr(optimizer, lr)
@@ -80,13 +79,12 @@ def train_v2v_epoch(
         logits_1 = model(inputs[1])
 
         # Compute the loss.
-        # print(f"preds size = {preds.size()} labels = {labels}")
         diffs = (logits_1 - logits_0).squeeze(dim=1)
         labels = torch.ones(diffs.shape[0]).cuda()
         loss = loss_fun(diffs, labels)
 
         if use_wandb:
-            wandb.log({"loss": loss})
+            wandb.log({"loss": loss, "iteration": cur_iter})
             wandb.watch(model)
 
         preds = diffs
@@ -246,7 +244,7 @@ def train_epoch(
         # print(f"loss = {loss}")
 
         if use_wandb:
-            wandb.log({"loss": loss})
+            wandb.log({"loss": loss, "iteration": cur_iter})
             wandb.watch(model)
 
 

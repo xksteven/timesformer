@@ -1,3 +1,5 @@
+# ignore the weights and biases folder
+wandb/*
 
 # Pytorch models
 *.pyth
