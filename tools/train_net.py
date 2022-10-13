@@ -25,9 +25,12 @@ from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 logger = logging.get_logger(__name__)
 
+import wandb
+wandb.init(project="Emotions-Timesformer", entity="xksteven")
+
 
 def train_v2v_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None
+    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=True,
 ):
     """
     Perform the video training for one epoch on V2V dataset.
@@ -48,12 +51,13 @@ def train_v2v_epoch(
     train_meter.iter_tic()
     data_size = len(train_loader)
 
+    if use_wandb:
+        wandb.config = cfg
+
     cur_global_batch_size = cfg.NUM_SHARDS * cfg.TRAIN.BATCH_SIZE
     num_iters = cfg.GLOBAL_BATCH_SIZE // cur_global_batch_size
 
     for cur_iter, (inputs, _, _, meta) in enumerate(train_loader):
-        logger.info(f"inputs = {inputs} ")
-        logger.info(f"size of inputs0 = {inputs[0].size()} ")
         # Transfer the data to the current GPU device.
         if cfg.NUM_GPUS:
             if isinstance(inputs, (list,)):
@@ -80,6 +84,10 @@ def train_v2v_epoch(
         diffs = (logits_1 - logits_0).squeeze(dim=1)
         labels = torch.ones(diffs.shape[0]).cuda()
         loss = loss_fun(diffs, labels)
+
+        if use_wandb:
+            wandb.log({"loss": loss})
+            wandb.watch(model)
 
         preds = diffs
 
@@ -151,7 +159,7 @@ def train_v2v_epoch(
 
 
 def train_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None
+    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=True,
 ):
     """
     Perform the video training for one epoch.
@@ -171,6 +179,10 @@ def train_epoch(
     model.train()
     train_meter.iter_tic()
     data_size = len(train_loader)
+
+    if use_wandb:
+        wandb.config = cfg
+
 
     cur_global_batch_size = cfg.NUM_SHARDS * cfg.TRAIN.BATCH_SIZE
     num_iters = cfg.GLOBAL_BATCH_SIZE // cur_global_batch_size
@@ -232,6 +244,11 @@ def train_epoch(
         #print(f"preds size = {preds.size()} labels = {labels.size()}")
         loss = loss_fun(preds, labels)
         # print(f"loss = {loss}")
+
+        if use_wandb:
+            wandb.log({"loss": loss})
+            wandb.watch(model)
+
 
         if cfg.MIXUP.ENABLED:
             labels = hard_labels
