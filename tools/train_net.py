@@ -83,10 +83,6 @@ def train_v2v_epoch(
         labels = torch.ones(diffs.shape[0]).cuda()
         loss = loss_fun(diffs, labels)
 
-        if use_wandb:
-            wandb.log({"loss": loss, "iteration": cur_iter})
-            wandb.watch(model)
-
         preds = diffs
 
         # check Nan Loss.
@@ -124,6 +120,10 @@ def train_v2v_epoch(
             loss.item(),
             top1_err.item(),
         )
+
+        if use_wandb:
+            wandb.log({"loss": loss, "iteration": cur_iter})
+            wandb.watch(model)
 
         # Update and log stats.
         train_meter.update_stats(
@@ -239,14 +239,7 @@ def train_epoch(
             one_hot_labels = labels
 
         # Compute the loss.
-        #print(f"preds size = {preds.size()} labels = {labels.size()}")
         loss = loss_fun(preds, labels)
-        # print(f"loss = {loss}")
-
-        if use_wandb:
-            wandb.log({"loss": loss, "iteration": cur_iter})
-            wandb.watch(model)
-
 
         if cfg.MIXUP.ENABLED:
             labels = hard_labels
@@ -333,6 +326,11 @@ def train_epoch(
                     },
                     global_step=data_size * cur_epoch + cur_iter,
                 )
+
+        if use_wandb:
+            wandb.log({"loss": loss, "iteration": cur_iter})
+            wandb.watch(model)
+
 
         train_meter.iter_toc()  # measure allreduce for this meter
         train_meter.log_iter_stats(cur_epoch, cur_iter)
