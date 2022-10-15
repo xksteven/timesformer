@@ -60,7 +60,6 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
 
-
         test_meter.data_toc()
 
         # logits = model(inputs)
@@ -101,13 +100,11 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
             f"Pairwise error = {pairwise_error / len(test_loader)}"
         )
 
-    #test_meter.finalize_metrics()
 
     # Listwise evaluation
     all_predictions = []
     for cur_iter, (inputs, _, _, meta) in enumerate(tqdm(listwise_loader)):
-        logger.info(f"inputs = {inputs} ")
-        logger.info(f"size of inputs0 = {inputs[0].size()} ")
+        #logger.info(f"len inputs = {len(inputs)}\nsize of inputs0 = {inputs[0].size()} ")
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -116,42 +113,25 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
             else:
                 inputs = inputs.float().cuda(non_blocking=True)
 
-
-        # The inputs come in as a list of 2 stacks of 3 each.  
-        # lets just run the whole set of 6 through the model in one go.
+        #logger.info(f"listwise meta = {meta}")
+        # lets just run the whole set through the model in one go.
         stacked_inputs = torch.cat(inputs, 0)
-        # for vid_batch in inputs:
+        #logger.info(f"stacked_inputs size = {stacked_inputs.size()}")
         logits = model(stacked_inputs)
        
         if cfg.NUM_GPUS > 1:
             preds = du.all_gather(logits)
 
+        tmp = torch.stack(preds, 0).T
 
-        #logger.info(f"preds before = {preds}")
-        # Here's where things get messy because the dimensions of this are gpus x logits x 2
-        # so we need to split the logits in half and across each group too.
-        # Ultimately we want a row in preds to be the result of 1 set of movies logits.
-        _first_half = preds[:len(preds)//2]
-        _second_half = preds[len(preds)//2:]
-
-
-        _first_half = torch.stack(_first_half, 0).T
-        _second_half = torch.stack(_second_half, 0).T
-
-
-        tmp = []
-        tmp.append(_first_half)
-        tmp.append(_second_half)
-
-        tmp = torch.cat(tmp, 0)
-        #logger.info(f"tmp size = {tmp.size()}")
         preds = tmp
+ 
         for pred in preds:
             all_predictions.append(pred.cpu().data.numpy())
 
-
+    logger.info(all_predictions)
     correct = 0
-    for sublist in all_predictions:
+    for sublist in tqdm(all_predictions):
        # predict everything in order
        prev = -float('inf')
        curr_correct = True
@@ -170,9 +150,11 @@ def perform_v2v_test(test_loader, listwise_loader, model, test_meter, cfg, write
        #     correct += 1
 
     total = len(all_predictions)
-    logger.info(
-        f"len listwise = {len(listwise_loader)}, gpus * batchsize * len loader = {cfg.NUM_GPUS * len(listwise_loader)}\n"
-        "V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
+    logger.warn("V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
+
+    print("V2V List wise Total: {}, Correct: {} Accuracy: {}\n".format(total, correct, correct / total))
+
+    logger.info(f"len listwise = {len(listwise_loader)}, gpus * len loader = {cfg.NUM_GPUS * len(listwise_loader)}\n")
 
     return test_meter
 

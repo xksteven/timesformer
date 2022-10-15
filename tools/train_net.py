@@ -25,12 +25,12 @@ from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 
 logger = logging.get_logger(__name__)
 
-import wandb
-wandb.init(project="Emotions-Timesformer", entity="xksteven")
+#import wandb
+#wandb.init(project="Emotions-Timesformer", entity="xksteven")
 
 
 def train_v2v_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=True,
+    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=False,
 ):
     """
     Perform the video training for one epoch on V2V dataset.
@@ -122,8 +122,8 @@ def train_v2v_epoch(
         )
 
         if use_wandb:
-            wandb.log({"loss": loss, "iteration": cur_iter})
-            wandb.watch(model)
+            if cur_iter % 20 == 0:
+                wandb.log({"loss": loss, "iteration": cur_iter})
 
         # Update and log stats.
         train_meter.update_stats(
@@ -157,7 +157,7 @@ def train_v2v_epoch(
 
 
 def train_epoch(
-    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=True,
+    train_loader, model, optimizer, train_meter, cur_epoch, cfg, writer=None, use_wandb=False,
 ):
     """
     Perform the video training for one epoch.
@@ -328,8 +328,8 @@ def train_epoch(
                 )
 
         if use_wandb:
-            wandb.log({"loss": loss, "iteration": cur_iter})
-            wandb.watch(model)
+             if cur_iter % 20 == 0:
+                wandb.log({"loss": loss, "iteration": cur_iter})
 
 
         train_meter.iter_toc()  # measure allreduce for this meter

@@ -40,6 +40,7 @@ class V2VPairwiseDataset(Dataset):
         self.video_width = video_width
         self.video_height = video_height
         self.num_frames =  num_frames
+        self.split = split
         self.data_path = Path(dataset_path)
         assert self.data_path.is_dir()
 
@@ -78,11 +79,19 @@ class V2VPairwiseDataset(Dataset):
         md_2 = self.metadata_2[idx]
         return [video_1, video_2], [], idx, (md_1, md_2)
 
+    def __repr__(self):
+        return f"V2V Pairwise Loader for {self.split} split with length = {len(self.video_paths_1)}"
+    def __str__(self):
+        return f"V2V Pairwise Loader for {self.split} split with length = {len(self.video_paths_1)}"
+
+
+
 class V2VListwiseDataset(Dataset):
 
     def __init__(self, dataset_path, split=None, video_width=256, video_height=256, num_frames=8):
         self.video_width = video_width
         self.video_height = video_height
+        self.split = split
         self.num_frames =  num_frames
         self.data_path = Path(dataset_path)
         assert self.data_path.is_dir()
@@ -126,6 +135,13 @@ class V2VListwiseDataset(Dataset):
         for metadata in self.nested_metadata[idx]:
             metadata_list.append(metadata)
         return videos_list, [], idx, metadata_list
+
+    def __repr__(self):
+        return f"V2V Listwise Loader for {self.split} split with length = {len(self.nested_video_paths)}"
+    def __str__(self):
+        return f"V2V Listwise Loader for {self.split} split with length = {len(self.nested_video_paths)}"
+
+
 
 
 if __name__ == '__main__':

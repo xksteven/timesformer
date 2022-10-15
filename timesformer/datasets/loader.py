@@ -79,7 +79,7 @@ def construct_loader(cfg, split, is_precise_bn=False, listwise=False):
         drop_last = False
 
     # Construct the dataset
-    dataset = build_dataset(dataset_name, cfg, split, listwise=False)
+    dataset = build_dataset(dataset_name, cfg, split, listwise=listwise)
 
     if cfg.MULTIGRID.SHORT_CYCLE and split in ["train"] and not is_precise_bn:
         # Create a sampler for multi-process training
