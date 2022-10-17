@@ -204,7 +204,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
                 #logger.info(f"new_labels size = {new_labels.size()}")
                 labels = new_labels
             labels = labels.float().cuda(non_blocking=True)
-            video_idx = video_idx.cuda()
+            video_idx = video_idx.cuda(non_blocking=True)
             #for key, val in meta.items():
             #    if isinstance(val, (list,)):
             #        for i in range(len(val)):
@@ -212,10 +212,6 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             #    else:
             #        meta[key] = val.cuda(non_blocking=True)
 
-        if len(labels.size()) > 1:
-            one_hot_labels = torch.argmax(labels, dim=1)
-        else:
-            one_hot_labels = labels
         test_meter.data_toc()
 
         # Perform the forward pass.
@@ -231,9 +227,14 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             labels = labels.cpu()
             video_idx = video_idx.cpu()
 
+        if len(labels.size()) > 1:
+            one_hot_labels = torch.argmax(labels, dim=1)
+        else:
+            one_hot_labels = labels
+ 
         test_meter.iter_toc()
 
-        #logger.warn(f"preds = {preds.size()} labels = {labels.size()} video_idx = {video_idx}")
+        #logger.warn(f"preds = {preds.size()} labels = {labels.size()} video_idx = {video_idx.size()}")
 
         # Update and log stats.
         test_meter.update_stats(
